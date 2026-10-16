@@ -2,7 +2,7 @@
 
 Нативный клиент audio.lgbt без WebView, браузерного процесса и локального веб-сервера. Один установщик, совместимость с браузером, сквозное шифрование аудио, видео и чата.
 
-[Скачать установщик](https://audio.lgbt/download) · [Сервер и сайт](https://github.com/aes-gcm/audio.lgbt) · [Сборка из исходников](desktop/README.md)
+[Скачать установщик](https://github.com/aes-gcm/audio.lgbt-windows/releases) · [Сервер и сайт](https://github.com/aes-gcm/audio.lgbt) · [Сборка из исходников](desktop/README.md)
 
 ## Свой сервер
 
