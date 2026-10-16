@@ -14,7 +14,7 @@ internal sealed record UpdateProgress(string Stage, long Received = 0, long Tota
 internal sealed class AppUpdate : IDisposable
 {
     internal static bool OfficialUpdates => typeof(AppUpdate).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>().Any(value => value.Key == "OfficialUpdates" && value.Value == "true");
-    internal static readonly Uri Feed = new("https://audio.lgbt/downloads/windows-x64.json");
+    internal static readonly Uri Feed = new("https://raw.githubusercontent.com/aes-gcm/audio.lgbt-windows/main/update/windows-x64.json");
     internal static string CurrentVersion => typeof(AppUpdate).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion.Split('+')[0];
     private readonly HttpClient http;
     internal AppUpdate(HttpMessageHandler? handler = null) => http = new(handler ?? new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(30) };
@@ -45,11 +45,27 @@ internal sealed class AppUpdate : IDisposable
     {
         _ = IsNewer(release.Version, "0.0.0");
         if (release.Architecture != "x64" || RuntimeInformation.ProcessArchitecture != Architecture.X64 ||
-            !Uri.TryCreate(release.Url, UriKind.Absolute, out var uri) || uri.Scheme != "https" || uri.Host != "audio.lgbt" || !uri.IsDefaultPort ||
+            !Uri.TryCreate(release.Url, UriKind.Absolute, out var uri) || uri.Scheme != "https" || uri.Host != "github.com" || !uri.IsDefaultPort ||
             uri.UserInfo.Length != 0 || uri.Query.Length != 0 || uri.Fragment.Length != 0 ||
-            uri.AbsolutePath != $"/downloads/audio.lgbt-{release.Version}-x64.exe" ||
+            uri.AbsolutePath != $"/aes-gcm/audio.lgbt-windows/releases/download/v{release.Version}/audio.lgbt-{release.Version}-x64.exe" ||
             release.Size is < 1024 or > 300_000_000 || release.Sha256.Length != 64 || !release.Sha256.All(Uri.IsHexDigit))
             throw new InvalidDataException("Invalid update manifest.");
+    }
+    private async Task<HttpResponseMessage> OpenInstaller(Uri uri, CancellationToken token)
+    {
+        for (int redirects = 0; redirects < 4; redirects++)
+        {
+            var response = await http.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, token);
+            if ((int)response.StatusCode is not (301 or 302 or 303 or 307 or 308)) return response;
+            var location = response.Headers.Location;
+            response.Dispose();
+            if (location is null) throw new InvalidDataException("Missing download redirect.");
+            var next = new Uri(uri, location);
+            if (next.Scheme != "https" || !next.IsDefaultPort || next.UserInfo.Length != 0 || next.Fragment.Length != 0 ||
+                next.Host != "release-assets.githubusercontent.com") throw new InvalidDataException("Untrusted download redirect.");
+            uri = next;
+        }
+        throw new InvalidDataException("Too many download redirects.");
     }
     internal async Task<UpdateRelease?> Check(CancellationToken token)
     {
@@ -69,7 +85,7 @@ internal sealed class AppUpdate : IDisposable
         string path = Path.Combine(directory, "Setup.exe"), partial = path + ".partial";
         try
         {
-            using var response = await http.GetAsync(release.Url, HttpCompletionOption.ResponseHeadersRead, token); response.EnsureSuccessStatusCode();
+            using var response = await OpenInstaller(new Uri(release.Url), token); response.EnsureSuccessStatusCode();
             if (response.Content.Headers.ContentLength is long length && length != release.Size) throw new InvalidDataException("Download size mismatch.");
             using var source = await response.Content.ReadAsStreamAsync(token);
             using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);

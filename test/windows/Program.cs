@@ -12,6 +12,7 @@ internal static class Program
     {
         try
         {
+            if (args.Contains("github-update-checks")) { Task.Run(UpdateChecks.GitHub).GetAwaiter().GetResult(); return 0; }
             if (args.Contains("server-checks")) { Task.Run(ServerChecks.Run).GetAwaiter().GetResult(); return 0; }
             if (args.Contains("server-ui-checks")) return ServerChecks.RunUi();
             if (args.Contains("update-restarted")) { File.WriteAllText("dist/update-chain-restarted.txt", "OK"); return 0; }
@@ -21,7 +22,7 @@ internal static class Program
                 string folder=Path.GetFullPath("dist/update-chain"); Directory.CreateDirectory(folder);
                 string installer=Path.Combine(folder,"Setup.exe");File.Copy(file,installer,true);
                 var hash=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(installer)));
-                var release=new UpdateRelease(AppUpdate.CurrentVersion,"x64",$"https://audio.lgbt/downloads/audio.lgbt-{AppUpdate.CurrentVersion}-x64.exe",new FileInfo(installer).Length,hash);
+                var release=new UpdateRelease(AppUpdate.CurrentVersion,"x64",$"https://github.com/aes-gcm/audio.lgbt-windows/releases/download/v{AppUpdate.CurrentVersion}/audio.lgbt-{AppUpdate.CurrentVersion}-x64.exe",new FileInfo(installer).Length,hash);
                 AppUpdate.StartInstaller(installer,release,["update-restarted"],new Point(450,300),default).GetAwaiter().GetResult();return 0;
             }
             if (args.Contains("output-checks")) { Task.Run(OutputChecks.Run).GetAwaiter().GetResult(); return 0; }
@@ -89,3 +90,4 @@ internal static class Program
         catch(Exception e){Console.Error.WriteLine(e);return 1;}
     }
 }
+
