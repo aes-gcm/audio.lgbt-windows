@@ -4,7 +4,7 @@
   <UseWindowsForms>true</UseWindowsForms><EnableWindowsTargeting>true</EnableWindowsTargeting>
   <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   <AssemblyName>audio.lgbt</AssemblyName><RootNamespace>AudioLgbt</RootNamespace>
-  <Product>audio.lgbt</Product><Company>audio.lgbt</Company><Version>0.3.0-preview.8</Version>
+  <Product>audio.lgbt</Product><Company>audio.lgbt</Company><Version>0.3.0-preview.9</Version>
   <OfficialUpdates Condition="'$(OfficialUpdates)' == ''">true</OfficialUpdates>
   <TargetLatestRuntimePatch>true</TargetLatestRuntimePatch><RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
   <ApplicationManifest>../Common/app.manifest</ApplicationManifest><ApplicationIcon>Assets/audio.lgbt.ico</ApplicationIcon>
