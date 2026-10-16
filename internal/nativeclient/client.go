@@ -423,7 +423,12 @@ func (c *Client) signal(m Msg) error {
 		c.emit(map[string]any{"type": "chat", "peerId": m.PeerID, "text": payload.Text})
 		return nil
 	case "error":
-		message := map[string]string{"room is full": "В комнате больше нет свободных мест.", "room is locked": "Организатор закрыл вход в комнату.", "server is at capacity": "Сервер занят. Попробуйте позже.", "a valid token is required to create a room": "Организатор ещё не открыл комнату. Для создания комнаты войдите в аккаунт через настройки сервера."}[m.Error]
+		if m.Error == "a valid token is required to create a room" {
+			c.emit(map[string]any{"type": "authentication-required"})
+			c.cancel()
+			return nil
+		}
+		message := map[string]string{"room is full": "В комнате больше нет свободных мест.", "room is locked": "Организатор закрыл вход в комнату.", "server is at capacity": "Сервер занят. Попробуйте позже."}[m.Error]
 		if message == "" {
 			message = "Сервер отклонил подключение: " + m.Error
 		}

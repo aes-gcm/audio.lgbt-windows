@@ -26,14 +26,20 @@ const wait=async(fn,label)=>{const end=Date.now()+25000;while(Date.now()<end){co
  try{
   const context=await browser.newContext({permissions:['camera','microphone']});const page=await context.newPage();
   await page.goto(base+'/?debug=1');await page.click('#createRoom');
-  if(process.env.AUTH_USER){await page.fill('#accountName',process.env.AUTH_USER);await page.fill('#accountPassword',process.env.AUTH_PASSWORD);await page.click('#accountSubmit');}
+  if(process.env.AUTH_USER && process.env.NATIVE_CREATES==='1'){
+   const login=await context.request.post(base+'/api/login',{data:{username:process.env.AUTH_USER,password:process.env.AUTH_PASSWORD}});assert.equal(login.status(),200);
+  }
   await page.waitForSelector('#join:not([disabled])');
   const key=new URL(page.url()).hash.slice(1);
   if(process.env.NATIVE_CREATES==='1'){
    const authToken=(await context.cookies()).find(c=>c.name==='audio_session')?.value;
    send({type:'start',server:base+'/',key,name:'Приложение',relay:false,authToken});await wait(()=>welcome,'authenticated native creates room');
   }
-  await page.fill('#name','Браузер');await page.click('#join');await page.waitForSelector('#call:not([hidden])');
+  await page.fill('#name','Браузер');await page.click('#join');
+  if(process.env.AUTH_USER && process.env.NATIVE_CREATES!=='1'){
+   await page.waitForSelector('#accountDialog[open]');await page.fill('#accountName',process.env.AUTH_USER);await page.fill('#accountPassword',process.env.AUTH_PASSWORD);await page.click('#accountSubmit');
+  }
+  await page.waitForSelector('#call:not([hidden])');
   if(process.env.NATIVE_CREATES!=='1'){send({type:'start',server:base+'/',key,name:'Приложение',relay:false});await wait(()=>welcome,'native guest welcome');}
   await wait(()=>nativeAudio>10&&nativeVideo>5,'native decrypts browser Opus/VP8');
   const received=await wait(async()=>page.evaluate(async()=>{const stats=await __z.sub().getStats();const values=[...stats.values()];const audio=values.find(s=>s.type==='inbound-rtp'&&s.kind==='audio');const video=values.find(s=>s.type==='inbound-rtp'&&s.kind==='video');return audio?.totalAudioEnergy>0&&video?.framesDecoded>5?{audioEnergy:audio.totalAudioEnergy,videoDecoded:video.framesDecoded}:false;}),'browser decodes native encrypted Opus/VP8');

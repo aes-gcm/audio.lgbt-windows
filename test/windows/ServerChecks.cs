@@ -27,18 +27,26 @@ internal static class ServerChecks
                 var target=Environment.GetEnvironmentVariable("BASE_URL")??"http://127.0.0.1:8082/";
                 address.Text=target; save.PerformClick(); await Wait(()=>Overlay()==null);
                 if(Preferences.Load(Path.Combine(root,"ui-preferences.json")).Server!=target)throw new Exception("Selected server not saved");
-                Open(); await Wait(()=>Children(Overlay()!).OfType<ModernButton>().Any(b=>b.Visible&&b.Text=="Войти в аккаунт"));
-                Children(Overlay()!).OfType<ModernButton>().Single(b=>b.Text=="Войти в аккаунт").PerformClick();
-                var login=Overlay()!;var fields=Children(login).OfType<ModernInput>().ToArray();
+                Open(); await Task.Delay(300);
+                if(Children(Overlay()!).OfType<ModernButton>().Any(b=>b.Visible&&b.Text=="Войти в аккаунт"))throw new Exception("Standalone login remains visible");
+                typeof(MainWindow).GetMethod("CloseModal",flags)!.Invoke(window,null);
+                var invitation=(ModernInput)typeof(MainWindow).GetField("invitation",flags)!.GetValue(window)!;
+                const string roomKey="AAAAAAAAAAAAAAAAAAAAAA";
+                invitation.Text=target+"#"+roomKey;
+                await (Task)typeof(MainWindow).GetMethod("JoinCall",flags)!.Invoke(window,[false])!;
+                await Wait(()=>Overlay()!=null);
+                typeof(MainWindow).GetMethod("CloseModal",flags)!.Invoke(window,null);
+                await (Task)typeof(MainWindow).GetMethod("JoinCall",flags)!.Invoke(window,[false])!;
+                await Wait(()=>Overlay()!=null);                var login=Overlay()!;var fields=Children(login).OfType<ModernInput>().ToArray();
                 fields.Single(c=>c.AccessibleName=="Логин").Text="admin";
                 var password=fields.Single(c=>c.AccessibleName=="Пароль");password.Text="local-test-password-123";
                 if(!password.UseSystemPasswordChar)throw new Exception("Password is visible");
                 using(var image=new Bitmap(login.Width,login.Height)){login.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save(Path.Combine(root,"login.png"));}
                 Children(login).OfType<ModernButton>().Single(b=>b.Text=="Войти").PerformClick();
-                await Wait(()=>Overlay()!=login);
-                await Wait(()=>Children(Overlay()!).OfType<ModernButton>().Any(b=>b.Visible&&b.Text.StartsWith("Выйти из аккаунта")));
+                await Wait(()=>(bool)typeof(MainWindow).GetField("inCall",flags)!.GetValue(window)!);
+                if((string)typeof(MainWindow).GetField("key",flags)!.GetValue(window)! != roomKey)throw new Exception("Room key changed after login");
                 if(Application.OpenForms.Count!=1)throw new Exception("Login created another window");
-                Console.WriteLine("PASS native modal server validation/save/login and password masking");
+                Console.WriteLine("PASS native server selection, first-join login, cancellation/retry, automatic join with same invitation and password masking");
             }
             catch(Exception e){Console.Error.WriteLine(e);result=1;}
             finally{window.Close();}

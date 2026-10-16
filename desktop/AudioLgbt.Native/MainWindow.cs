@@ -10,6 +10,7 @@ internal sealed class MainWindow : Form
     private LaunchOptions options;
     private ServerAccount account;
     private bool authorizing;
+    private bool authenticationRetried;
     private readonly Preferences preferences;
     private readonly RoomHistory history;
     private bool creatingRoom;
@@ -128,7 +129,7 @@ internal sealed class MainWindow : Form
         var feedback = Theme.Label("", muted: true); feedback.MaximumSize = new Size(450, 0);
         var save = Theme.Button("Подключить сервер", true); save.Dock = DockStyle.Top; save.Margin = new Padding(0, 0, 0, 12);
         var reset = Theme.Button("Основной сервер audio.lgbt"); reset.Dock = DockStyle.Top; reset.Margin = new Padding(0, 0, 0, 12); reset.Click += (_, _) => address.Text = "https://audio.lgbt/";
-        var login = Theme.Button("Войти в аккаунт"); login.Dock = DockStyle.Top; login.Visible = false;
+        var login = Theme.Button("Выйти из аккаунта"); login.Dock = DockStyle.Top; login.Visible = false;
         bool busy = false;
         content.Controls.Add(Theme.Label("Адрес сервера")); content.Controls.Add(address); content.Controls.Add(save); content.Controls.Add(reset); content.Controls.Add(login); content.Controls.Add(feedback);
         ShowModal("Сервер", content, new Size(560, 430)); var overlay = modal!; overlay.CanClose = () => !busy;
@@ -152,12 +153,11 @@ internal sealed class MainWindow : Form
         try
         {
             var state = await account.Status(); if (overlay.IsDisposed) return;
-            login.Visible = state.AuthenticationRequired;
-            login.Text = state.Username.Length > 0 ? "Выйти из аккаунта (" + state.Username + ")" : "Войти в аккаунт";
+            login.Visible = state.Username.Length > 0;
+            login.Text = "Выйти из аккаунта (" + state.Username + ")";
             login.Click += async (_, _) =>
             {
                 if (busy) return;
-                if (state.Username.Length == 0) { ShowLogin(() => { ShowServer(); return Task.CompletedTask; }); return; }
                 busy = true;
                 try { await account.Logout(); CloseModal(); ShowServer(); }
                 catch { feedback.Text = "Не удалось выйти. Попробуйте снова."; }
@@ -173,9 +173,10 @@ internal sealed class MainWindow : Form
         var password = Theme.Input("Пароль"); password.UseSystemPasswordChar = true; password.AccessibleName = "Пароль";
         var feedback = Theme.Label("", muted: true); feedback.MaximumSize = new Size(420, 0);
         var submit = Theme.Button("Войти", true); submit.Dock = DockStyle.Top;
-        content.Controls.Add(Theme.Label(options.Server.Authority, muted: true)); content.Controls.Add(Theme.Label("Логин")); content.Controls.Add(username); content.Controls.Add(Theme.Label("Пароль")); content.Controls.Add(password); content.Controls.Add(submit); content.Controls.Add(feedback);
+        content.Controls.Add(Theme.Label("Вы входите первым. Войдите, чтобы открыть комнату.", muted: true)); content.Controls.Add(Theme.Label(options.Server.Authority, muted: true)); content.Controls.Add(Theme.Label("Логин")); content.Controls.Add(username); content.Controls.Add(Theme.Label("Пароль")); content.Controls.Add(password); content.Controls.Add(submit); content.Controls.Add(feedback);
         bool busy = false;
-        ShowModal("Вход на сервер", content, new Size(540, 440)); modal!.CanClose = () => !busy;
+        ShowModal("Открыть комнату", content, new Size(580, 470)); modal!.CanClose = () => !busy;
+        authorizing = true; modal.Disposed += (_, _) => authorizing = false;
         async Task Submit()
         {
             if (busy) return; busy = true; submit.Enabled = false; submit.Text = "Входим…"; feedback.Text = "";
@@ -186,31 +187,18 @@ internal sealed class MainWindow : Form
         submit.Click += async (_, _) => await Submit(); password.KeyDown += async (_, e) => { if (e.KeyCode == Keys.Enter) { e.Handled = e.SuppressKeyPress = true; await Submit(); } };
         username.Focus();
     }
-    private async Task JoinCall(bool newRoom)
+    private Task JoinCall(bool newRoom) => JoinRoom(newRoom);
+    private async Task JoinRoom(bool newRoom, string? retryKey = null)
     {
         if (joining || inCall || authorizing || closing || IsDisposed) return;
-        if (newRoom)
-        {
-            authorizing = true; homeError.Text = "Проверяем сервер…";
-            try
-            {
-                var serverStatus = await account.Status();
-                if (closing || IsDisposed) return;
-                if (serverStatus.AuthenticationRequired && serverStatus.Username.Length == 0)
-                {
-                    homeError.Text = ""; ShowLogin(() => JoinCall(true)); return;
-                }
-                homeError.Text = "";
-            }
-            catch { homeError.Text = "Сервер недоступен. Проверьте адрес и подключение."; return; }
-            finally { authorizing = false; }
-        }
-        if (!newRoom)
+        if (retryKey is not null) key = retryKey;
+        else if (!newRoom)
         {
             if (!Uri.TryCreate(invitation.Text.Trim(), UriKind.Absolute, out var uri) || !LaunchOptions.IsInvitation(options.Server, uri)) { homeError.Text = "Вставьте полную ссылку на комнату, включая часть после #."; invitation.Focus(); return; }
             key = uri.Fragment[1..];
         }
         else key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(16)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        authenticationRetried = retryKey is not null;
         creatingRoom = newRoom; joining = true; create!.Enabled = join!.Enabled = false; homeError.Text = "Подключение…";
         myName = name.Text.Trim(); if (myName.Length == 0) myName = "Гость"; SaveName();
         var current = ++generation;
@@ -254,6 +242,11 @@ internal sealed class MainWindow : Form
             if (current != generation) return;
             switch (type)
             {
+                case "authentication-required":
+                    var roomKey = key; var wasCreating = creatingRoom; var retried = authenticationRetried;
+                    await LeaveCall(retried ? "Не удалось открыть комнату. Попробуйте подключиться ещё раз." : "");
+                    if (!retried && !closing && !IsDisposed) ShowLogin(() => JoinRoom(wasCreating, roomKey));
+                    break;
                 case "welcome":
                     history.Remember(options.Server,options.Server.AbsoluteUri+"#"+key,creatingRoom);
                     selfId = m.GetProperty("selfId").GetString()!; host = Bool(m, "host"); locked = Bool(m, "locked"); joining = false; inCall = true; ShowCall();
