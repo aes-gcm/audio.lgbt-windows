@@ -11,7 +11,9 @@
 ./scripts/build-native-installer.ps1 -SkipBuild -Nsis 'C:/Program Files (x86)/NSIS/makensis.exe'
 ```
 
-Первая команда скачивает FFmpeg LGPL shared в `.cache`, проверяет SHA256, собирает C#, движок Go и C++ захват. Если upstream изменил пакет, проверка останавливает сборку: используйте архив соответствующего dependency-release, а не отключайте проверку. Результат сборки — `dist/native-x64`; единый установщик — `dist/audio.lgbt-Native-Preview-Setup.exe`.
+Первая команда скачивает FFmpeg LGPL shared из [релиза зависимостей этого репозитория](https://github.com/aes-gcm/audio.lgbt-windows/releases/tag/dependencies-2026-10-15) в `.cache`, проверяет SHA256, собирает C#, движок Go и C++ захват. Результат сборки — `dist/native-x64`; единый установщик — `dist/audio.lgbt-Native-Preview-Setup.exe`.
+
+Для сборки старых тегов до переноса зависимостей скачайте оттуда `ffmpeg-x64.zip` или `ffmpeg-arm64.zip` и положите в `.cache` перед запуском скрипта. Контрольные суммы архивов сохранены.
 
 Зависимости закреплены в NuGet lock-файле, `go.mod`/`go.sum` и `DEPENDENCIES.txt`. DLL FFmpeg загружаются динамически и могут быть заменены совместимой сборкой. Лицензии необходимо сохранять при распространении. ARM64 можно кросс-собрать, но полноценная проверка на Windows ARM64 пока не заявляется; текущий установщик предназначен для x64.
 

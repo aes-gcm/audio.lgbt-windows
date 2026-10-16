@@ -13,7 +13,7 @@ try {
     $null = New-Item -ItemType Directory -Force -Path $dependencyDir
     $archive = Join-Path $dependencyDir "ffmpeg-$Architecture.zip"
     if (-not (Test-Path -LiteralPath $archive)) {
-        $releaseUrl = "https://github.com/aes-gcm/audio.lgbt/releases/download/dependencies-2026-10-15/ffmpeg-$Architecture.zip"
+        $releaseUrl = "https://github.com/aes-gcm/audio.lgbt-windows/releases/download/dependencies-2026-10-15/ffmpeg-$Architecture.zip"
         Invoke-WebRequest -Uri $releaseUrl -OutFile $archive
     }
     $hashes = @{
