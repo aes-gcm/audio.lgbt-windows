@@ -13,6 +13,7 @@ internal sealed class AudioDevices : IDisposable
     private WaveInEvent? input;
     private IOpusEncoder? encoder;
     private NoiseReducer noise = new();
+    private MicrophoneLeveler leveler = new();
     private readonly VoiceActivity localActivity = new();
     private WasapiOut? output;
     private MMDevice? speaker;
@@ -85,7 +86,7 @@ internal sealed class AudioDevices : IDisposable
         next.RecordingStopped += (_, e) => { if (e.Exception is not null && !disposed) Error?.Invoke("Микрофон отключён. Выберите другое устройство в настройках."); };
         try { next.StartRecording(); } catch { next.Dispose(); throw; }
         WaveInEvent? old;
-        lock (gate) { if (disposed) { next.Dispose(); return; } old = input; input = next; encoder = nextEncoder; noise = new(); localActivity.Reset(); Muted = false; }
+        lock (gate) { if (disposed) { next.Dispose(); return; } old = input; input = next; encoder = nextEncoder; noise = new(); leveler = new(); localActivity.Reset(); Muted = false; }
         old?.StopRecording(); old?.Dispose();
     }
     private void Capture(object? sender, WaveInEventArgs args)
@@ -97,8 +98,8 @@ internal sealed class AudioDevices : IDisposable
             var samples = MemoryMarshal.Cast<byte, short>(args.Buffer.AsSpan(0, args.BytesRecorded));
             if (samples.Length != 960) return;
             if (preferences.NoiseSuppression) noise.Process(samples);
-            var gain = Math.Clamp(preferences.MicGain / 100f, 0, 2);
-            for (var i = 0; i < samples.Length; i++) { samples[i] = (short)Math.Clamp(samples[i] * gain, short.MinValue, short.MaxValue); peak = Math.Max(peak, Math.Abs(samples[i] / 32768f)); }
+            leveler.Process(samples, preferences.MicGain);
+            for (var i = 0; i < samples.Length; i++) peak = Math.Max(peak, Math.Abs(samples[i] / 32768f));
             localActivity.Observe(samples, Environment.TickCount64);
             Span<byte> encoded = stackalloc byte[4096]; var length = encoder.Encode(samples, 960, encoded, encoded.Length); packet = encoded[..length].ToArray();
         }

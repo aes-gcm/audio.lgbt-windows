@@ -25,6 +25,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           dotnet run --project desktop/tests -c Release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet run --project test/windows -c Release -- microphone-checks
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           ./scripts/build-native.ps1
       - uses: actions/upload-artifact@v4
         with:

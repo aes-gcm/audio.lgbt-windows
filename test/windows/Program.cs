@@ -12,6 +12,8 @@ internal static class Program
     {
         try
         {
+            if (args.Contains("microphone-checks")) { MicrophoneChecks.Run(); return 0; }
+            if (args.Contains("microphone-capture")) { MicrophoneChecks.Capture().GetAwaiter().GetResult(); return 0; }
             if (args.Contains("github-update-checks")) { Task.Run(UpdateChecks.GitHub).GetAwaiter().GetResult(); return 0; }
             if (args.Contains("server-checks")) { Task.Run(ServerChecks.Run).GetAwaiter().GetResult(); return 0; }
             if (args.Contains("server-ui-checks")) return ServerChecks.RunUi();
